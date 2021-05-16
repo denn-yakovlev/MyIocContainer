@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace IocContainer.Demo
 {
@@ -29,15 +30,22 @@ namespace IocContainer.Demo
     [Service(Scope.Transient)]
     class C
     {
-        private A _a;
-        private int _num;
-        private string _str;
+        private readonly A _a;
+        private readonly int _num;
+        private readonly string _str;
+        private readonly IEnumerable<int> _ints;
 
-        public C(A a, [Inject(100500)] int num, [Inject("kek")] string str)
+        public C(
+            A a, 
+            [Inject(100500)] int num, 
+            [Inject("kek")] string str, 
+            [Inject(new[] {1,2,3})]IEnumerable<int> ints
+            )
         {
             _a = a;
             _num = num;
             _str = str;
+            _ints = ints;
         }
 
         public override string ToString() =>
@@ -48,10 +56,23 @@ namespace IocContainer.Demo
     {
             
     }
-
+    
+    [Service(Scope.Transient)]
+    [ProvideAs(typeof(ISomeInterface))]
     class D : ISomeInterface
     {
-            
+        private E _e;
+        
+        public D(E e)
+        {
+            _e = e;
+        }
+    }
+
+    [Service(Scope.Singleton)]
+    class E
+    {
+        
     }
     
     class Program
@@ -74,9 +95,8 @@ namespace IocContainer.Demo
 
             var c1 = container.Provide<C>();
             Console.WriteLine($"c == c1 ? -{ReferenceEquals(c, c1)}");
-
-            // Throws KeyNotFound exception
-            //var d = container.Provide<ISomeInterface>();
+            
+            var d = container.Provide<ISomeInterface>();
         }
     }
 }

@@ -1,15 +1,18 @@
 using System;
+using System.Linq.Expressions;
 
 namespace IocContainer
 {
     class TransientServiceFactory : IServiceFactory
     {
-        private readonly Func<object> _factory;
+        private readonly Lazy<Func<object>> _lazyFactory;
 
-        public TransientServiceFactory(Func<object> factory) =>
-            _factory = factory;
+        public TransientServiceFactory(Lazy<Func<object>> lazyFactory)
+        {
+            _lazyFactory = lazyFactory;
+        }
 
         public object GetInstance() =>
-            _factory();
+            _lazyFactory.Value.Invoke();
     }
 }

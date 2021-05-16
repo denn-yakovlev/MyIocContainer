@@ -22,11 +22,11 @@ namespace IocContainer
             var container = new Dictionary<Type, IServiceFactory>();
 
             var assembly = Assembly.GetCallingAssembly();
-            var serviceTypes = FindServices(assembly);
+            var implementationTypes = FindServices(assembly);
 
-            foreach (var serviceType in serviceTypes)
+            foreach (var implementationType in implementationTypes)
             {
-                var publicCtors = GetPublicCtors(serviceType);
+                var publicCtors = GetPublicCtors(implementationType);
                 ConstructorInfo primaryCtor;
                 try
                 {
@@ -34,30 +34,47 @@ namespace IocContainer
                 }
                 catch (InvalidOperationException)
                 {
-                    throw new ConstructorsAmbiguityException(serviceType);
+                    throw new ConstructorsAmbiguityException(implementationType);
                 }
 
-                var paramValues = primaryCtor
-                    .GetParameters()
-                    .Select(paramInfo => InjectParameter(paramInfo, container));
-                var factory = Expression.Lambda<Func<object>>(
-                    Expression.New(primaryCtor, paramValues.Select(Expression.Constant))
-                    ).Compile();
-
+                var ctorParams = primaryCtor.GetParameters();
+                var injectedParams = ctorParams
+                    .Select(p => InjectParameter(p,container))
+                    .Select(Expression.Constant);
+                
+                var lazyFactory = new Lazy<Func<object>>(() => 
+                    Expression.Lambda<Func<object>>(
+                            Expression.New(primaryCtor, injectedParams)
+                    )
+                    .Compile()
+                );
+                
+                var serviceType = ResolveServiceType(implementationType);
                 if (container.ContainsKey(serviceType))
-                    throw new InvalidOperationException($"Type {serviceType} is already registered");
+                    throw new InvalidOperationException(
+                        $"Type {implementationType} is already registered as {serviceType}"
+                        );
 
-                var scope = serviceType.GetCustomAttribute<ServiceAttribute>()?.Scope;
+                var scope = implementationType.GetCustomAttribute<ServiceAttribute>()?.Scope;
                 IServiceFactory provider = scope switch
                 {
-                    Scope.Singleton => new SingletonServiceFactory(factory),
-                    Scope.Transient => new TransientServiceFactory(factory),
+                    Scope.Singleton => new SingletonServiceFactory(lazyFactory),
+                    Scope.Transient => new TransientServiceFactory(lazyFactory),
                     _ => throw new ArgumentException()
                 };
-
+                
                 container[serviceType] = provider;
             }
             return new IocContainer(container);
+        }
+
+        private static Type ResolveServiceType(Type implementationType)
+        {
+            if (Attribute.IsDefined(implementationType, typeof(ProvideAsAttribute)))
+                return implementationType
+                    .GetCustomAttribute<ProvideAsAttribute>()
+                    ?.ServiceType;
+            return implementationType;
         }
 
         private static object InjectParameter(ParameterInfo paramInfo, IDictionary<Type, IServiceFactory> container)

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq.Expressions;
 
 namespace IocContainer
 {
@@ -6,10 +7,11 @@ namespace IocContainer
     {
         private readonly Lazy<object> _lazyInstance;
 
-        public SingletonServiceFactory(Func<object> factory) =>
-            _lazyInstance = new Lazy<object>(factory, true);
+        public SingletonServiceFactory(Lazy<Func<object>> lazyFactory)
+        {
+            _lazyInstance = new Lazy<object>(() => lazyFactory.Value.Invoke());
+        }
 
-        public object GetInstance() =>
-            _lazyInstance.Value;
+        public object GetInstance() => _lazyInstance.Value;
     }
 }
