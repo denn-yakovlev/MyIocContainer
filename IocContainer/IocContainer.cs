@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
 
 using static System.Linq.Expressions.Expression;
@@ -28,12 +27,7 @@ namespace IocContainer
 
             foreach (var implementationType in implementationTypes)
             {
-                var constructorInjectionExpr = new ConstructorInjector(implementationType, container)
-                    .GetInjectionExpression();
-
-                var serviceInstanceFactory = Lambda<Func<object>>(
-                    constructorInjectionExpr
-                ).Compile();
+                var serviceInstanceFactory = GetServiceInstanceFactory(implementationType, container);
 
                 var serviceType = ResolveServiceType(implementationType);
                 if (container.ContainsKey(serviceType))
@@ -55,6 +49,41 @@ namespace IocContainer
             return new IocContainer(container);
         }
 
+        private static Func<object> GetServiceInstanceFactory(Type implementationType, Dictionary<Type, IServiceFactory> container)
+        {
+            var constructorInjectionExpr = new ConstructorInjector(implementationType, container)
+                .GetInjectionExpression();
+            var newInstanceVariable = Variable(implementationType);
+            var fieldInjectionExpr = new FieldInjector(implementationType, container, newInstanceVariable)
+                .GetInjectionExpression();
+            var propertyInjectionExpr = new PropertyInjector(implementationType, container, newInstanceVariable)
+                .GetInjectionExpression();
+
+            /* Compiled body looks like:
+             * 
+             * <implementationType> $var1 = new <implementationType>(...);
+             * $var1.<field1> = ...;
+             * $var1.<field2> = ...;
+             * ...
+             * $var1.<fieldM> = ...;
+             * $var1.<prop1> = ...;
+             * $var1.<prop2> = ...;
+             * ...
+             * $var1.<propN> = ...;
+             * return $var1 as object;
+             */
+            var serviceInstanceFactoryBody = Block(
+                typeof(object),
+                new[] {newInstanceVariable},
+                Assign(newInstanceVariable, constructorInjectionExpr),
+                fieldInjectionExpr,
+                propertyInjectionExpr,
+                newInstanceVariable
+            );
+            var serviceInstanceFactory = Lambda<Func<object>>(serviceInstanceFactoryBody).Compile();
+            return serviceInstanceFactory;
+        }
+
         private static Type ResolveServiceType(Type implementationType)
         {
             bool implTypeHasProvideAsAttribute = Attribute.IsDefined(
@@ -63,7 +92,6 @@ namespace IocContainer
             if (implTypeHasProvideAsAttribute)
                 return implementationType.GetCustomAttribute<ProvideAsAttribute>()?.ServiceType;
             return implementationType;
-            // new Injector().GetInjectionExpression((MethodInfo methodInfo) => true);
         }
 
         private static IEnumerable<Type> FindServices(Assembly assembly) =>
@@ -72,69 +100,5 @@ namespace IocContainer
                 .Where(type => type.IsClass)
                 .Where(cls => cls.GetCustomAttribute<ServiceAttribute>() != null);
 
-    }
-
-    class ConstructorInjector 
-    {
-        private readonly ConstructorInfo _primaryCtor;
-        private readonly IDictionary<Type, IServiceFactory> _container;
-        
-        public ConstructorInjector(Type type, IDictionary<Type, IServiceFactory> container)
-        {
-            _container = container;
-            var publicCtors = GetPublicCtors(type);
-            try
-            {
-                _primaryCtor = GetPrimaryConstructorInfo(publicCtors);
-            }
-            catch (InvalidOperationException)
-            {
-                throw new ConstructorsAmbiguityException(type);
-            }
-        }
-        
-        public Expression GetInjectionExpression()
-        {
-
-            var paramsInjectionExpression = _primaryCtor
-                .GetParameters()
-                .Select(param => InjectParameterExpression(param));
-            return New(_primaryCtor, paramsInjectionExpression);
-        }
-
-        private Expression InjectParameterExpression(ParameterInfo param) => 
-            Convert(
-                Call(
-                    Constant(this),
-                    GetType().GetMethod(nameof(InjectParameter), BindingFlags.Instance | BindingFlags.NonPublic),
-                    Constant(param)
-                ),
-                param.ParameterType
-            );
-        
-        private object InjectParameter(ParameterInfo paramInfo)
-        {
-            bool shouldInjectConstantValue = Attribute.IsDefined(paramInfo, typeof(InjectAttribute));
-            if (shouldInjectConstantValue)
-                return paramInfo.GetCustomAttribute<InjectAttribute>().Value;
-            
-            bool shouldInjectServiceFromContainer = _container.ContainsKey(paramInfo.ParameterType);
-            if (shouldInjectServiceFromContainer)
-                return _container[paramInfo.ParameterType].GetInstance();
-
-            throw new ArgumentException(
-                $"No value to inject found in constructor parameter {paramInfo.Name} " +
-                $"of type {paramInfo.ParameterType} in {paramInfo.Member.DeclaringType}"
-            );
-        }
-
-        private static bool ConstructorIsPrimary(ConstructorInfo ctorInfo) =>
-            Attribute.IsDefined(ctorInfo, typeof(PrimaryCtorAttribute));
-
-        private static ConstructorInfo GetPrimaryConstructorInfo(IEnumerable<ConstructorInfo> publicCtors) =>
-            publicCtors.SingleOrDefault(ctorInfo => ConstructorIsPrimary(ctorInfo)) ?? publicCtors.SingleOrDefault();
-
-        private static IEnumerable<ConstructorInfo> GetPublicCtors(Type serviceType) =>
-            serviceType.GetConstructors().Where(ctorInfo => ctorInfo.IsPublic);
     }
 }

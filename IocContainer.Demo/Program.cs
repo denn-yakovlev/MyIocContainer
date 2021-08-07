@@ -61,6 +61,7 @@ namespace IocContainer.Demo
     [ProvideAs(typeof(ISomeInterface))]
     class D : ISomeInterface
     {
+        [FieldInjection]
         private E _e;
         
         public D(E e)
@@ -72,9 +73,18 @@ namespace IocContainer.Demo
     [Service(Scope.Singleton)]
     class E
     {
+        [FieldInjection]
+        private B _b;
+
+        [PropertyInjection]
+        private C C { get; set; }
         
+        [FieldInjection]
+        [Inject(69)]
+        private int _eee;
     }
     
+
     class Program
     {
         static void Main(string[] args)
@@ -97,6 +107,7 @@ namespace IocContainer.Demo
             Console.WriteLine($"c == c1 ? -{ReferenceEquals(c, c1)}");
             
             var d = container.Provide<ISomeInterface>();
+            var e = container.Provide<E>();
         }
     }
 }

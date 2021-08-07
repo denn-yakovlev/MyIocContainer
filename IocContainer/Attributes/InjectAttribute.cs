@@ -2,7 +2,7 @@ using System;
 
 namespace IocContainer
 {
-    [AttributeUsage(AttributeTargets.Parameter)]
+    [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Property | AttributeTargets.Field)]
     public class InjectAttribute : Attribute
     {
         public object Value { get; }
