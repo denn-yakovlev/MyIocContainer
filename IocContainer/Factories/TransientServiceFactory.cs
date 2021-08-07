@@ -5,14 +5,13 @@ namespace IocContainer
 {
     class TransientServiceFactory : IServiceFactory
     {
-        private readonly Lazy<Func<object>> _lazyFactory;
+        private readonly Func<object> _instanceFactory;
 
-        public TransientServiceFactory(Lazy<Func<object>> lazyFactory)
+        public TransientServiceFactory(Func<object> instanceFactory)
         {
-            _lazyFactory = lazyFactory;
+            _instanceFactory = instanceFactory;
         }
 
-        public object GetInstance() =>
-            _lazyFactory.Value.Invoke();
+        public object GetInstance() => _instanceFactory?.Invoke();
     }
 }

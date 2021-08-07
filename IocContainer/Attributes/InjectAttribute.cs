@@ -5,11 +5,11 @@ namespace IocContainer
     [AttributeUsage(AttributeTargets.Parameter)]
     public class InjectAttribute : Attribute
     {
-        public object Injection { get; }
+        public object Value { get; }
 
-        public InjectAttribute(object injection)
+        public InjectAttribute(object value)
         {
-            Injection = injection;
+            Value = value;
         }
     }
 }

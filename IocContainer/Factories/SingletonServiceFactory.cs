@@ -7,9 +7,9 @@ namespace IocContainer
     {
         private readonly Lazy<object> _lazyInstance;
 
-        public SingletonServiceFactory(Lazy<Func<object>> lazyFactory)
+        public SingletonServiceFactory(Func<object> instanceFactory)
         {
-            _lazyInstance = new Lazy<object>(() => lazyFactory.Value.Invoke());
+            _lazyInstance = new Lazy<object>(() => instanceFactory?.Invoke());
         }
 
         public object GetInstance() => _lazyInstance.Value;
