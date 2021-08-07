@@ -11,9 +11,9 @@ namespace IocContainer
     class ConstructorInjector : Injector
     {
         private ConstructorInfo _primaryCtor;
-        private readonly IDictionary<Type, IServiceFactory> _container;
+        private readonly IDictionary<Type, ServiceInfo> _container;
         
-        public ConstructorInjector(Type serviceType, IDictionary<Type, IServiceFactory> container) : 
+        public ConstructorInjector(Type serviceType, IDictionary<Type, ServiceInfo> container) : 
             base(serviceType, container)
         {
         }

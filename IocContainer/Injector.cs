@@ -9,9 +9,9 @@ namespace IocContainer
     abstract class Injector
     {
         protected readonly Type serviceType;
-        protected readonly IDictionary<Type, IServiceFactory> _container;
+        protected readonly IDictionary<Type, ServiceInfo> _container;
 
-        protected Injector(Type serviceType, IDictionary<Type, IServiceFactory> container)
+        protected Injector(Type serviceType, IDictionary<Type, ServiceInfo> container)
         {
             this.serviceType = serviceType;
             _container = container;
@@ -47,7 +47,7 @@ namespace IocContainer
                 return injectionTarget.InjectAttribute.Value;
             bool shouldInjectServiceFromContainer = _container.ContainsKey(injectionTarget.Type);
             if (shouldInjectServiceFromContainer)
-                return _container[injectionTarget.Type].GetInstance();
+                return _container[injectionTarget.Type].Factory.GetInstance();
             throw new ArgumentException($"No value to inject found of type {injectionTarget.Type}");
         }
     }

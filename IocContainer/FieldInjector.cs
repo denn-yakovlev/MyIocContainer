@@ -13,7 +13,7 @@ namespace IocContainer
         private IEnumerable<InjectionTarget> _fieldTargets;
 
         public FieldInjector(
-            Type serviceType, IDictionary<Type, IServiceFactory> container, Expression instanceVariable
+            Type serviceType, IDictionary<Type, ServiceInfo> container, Expression instanceVariable
         ) : base(serviceType, container, instanceVariable) 
         {
             

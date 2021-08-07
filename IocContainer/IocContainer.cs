@@ -7,49 +7,48 @@ using static System.Linq.Expressions.Expression;
 
 namespace IocContainer
 {
+    interface IServiceContainer
+    {
+        
+    }
+    
     public class IocContainer
     {
-        private readonly IDictionary<Type, IServiceFactory> _container;
+        private readonly IDictionary<Type, ServiceInfo> _container;
 
-        private IocContainer(IDictionary<Type, IServiceFactory> container)
+        private IocContainer(IDictionary<Type, ServiceInfo> container)
         {
             _container = container;
         }
 
-        public T Provide<T>() => (T) _container[typeof(T)].GetInstance();
+        public T Provide<T>() => (T) _container[typeof(T)].Factory.GetInstance();
 
         public static IocContainer Create()
         {
-            var container = new Dictionary<Type, IServiceFactory>();
+            var container = new Dictionary<Type, ServiceInfo>();
 
             var assembly = Assembly.GetCallingAssembly();
             var implementationTypes = FindServices(assembly);
 
             foreach (var implementationType in implementationTypes)
             {
+                var serviceInfo = new ServiceInfo(implementationType);
                 var serviceInstanceFactory = GetServiceInstanceFactory(implementationType, container);
 
-                var serviceType = ResolveServiceType(implementationType);
-                if (container.ContainsKey(serviceType))
+                serviceInfo.SetFactory(serviceInstanceFactory);
+                
+                if (container.ContainsKey(serviceInfo.ServiceType))
                     throw new InvalidOperationException(
-                        $"Type {implementationType} is already registered as {serviceType}"
+                        $"Type {implementationType} is already registered as {serviceInfo.ServiceType}"
                     );
 
-                var scope = implementationType.GetCustomAttribute<ServiceAttribute>()?.Scope;
-                IServiceFactory provider = scope switch
-                {
-                    Scope.Singleton => new SingletonServiceFactory(serviceInstanceFactory),
-                    Scope.Transient => new TransientServiceFactory(serviceInstanceFactory),
-                    _ => throw new ArgumentException()
-                };
-
-                container[serviceType] = provider;
+                container[serviceInfo.ServiceType] = serviceInfo;
             }
 
             return new IocContainer(container);
         }
 
-        private static Func<object> GetServiceInstanceFactory(Type implementationType, Dictionary<Type, IServiceFactory> container)
+        private static Func<object> GetServiceInstanceFactory(Type implementationType, Dictionary<Type, ServiceInfo> container)
         {
             var constructorInjectionExpr = new ConstructorInjector(implementationType, container)
                 .GetInjectionExpression();
@@ -84,21 +83,39 @@ namespace IocContainer
             return serviceInstanceFactory;
         }
 
-        private static Type ResolveServiceType(Type implementationType)
-        {
-            bool implTypeHasProvideAsAttribute = Attribute.IsDefined(
-                implementationType, typeof(ProvideAsAttribute)
-            );
-            if (implTypeHasProvideAsAttribute)
-                return implementationType.GetCustomAttribute<ProvideAsAttribute>()?.ServiceType;
-            return implementationType;
-        }
-
         private static IEnumerable<Type> FindServices(Assembly assembly) =>
             assembly
                 .GetTypes()
                 .Where(type => type.IsClass)
                 .Where(cls => cls.GetCustomAttribute<ServiceAttribute>() != null);
 
+    }
+
+    record ServiceInfo
+    {
+        public Type ImplementationType { get; }
+        public Type ServiceType { get; }
+        public Scope ServiceScope { get; }
+        
+        public IServiceFactory Factory { get; private set; }
+
+        public ServiceInfo(Type implementationType)
+        {
+            ImplementationType = implementationType;
+            var provideAsAttr = implementationType.GetCustomAttribute<ProvideAsAttribute>();
+            ServiceType = provideAsAttr?.ServiceType ?? implementationType;
+            var serviceAttr = implementationType.GetCustomAttribute<ServiceAttribute>();
+            ServiceScope = serviceAttr.Scope;
+        }
+
+        public void SetFactory(Func<object> factory)
+        {
+            Factory = ServiceScope switch
+            {
+                Scope.Singleton => new SingletonServiceFactory(factory),
+                Scope.Transient => new TransientServiceFactory(factory),
+                _ => throw new ArgumentException()
+            };
+        }
     }
 }

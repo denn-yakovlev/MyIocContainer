@@ -12,7 +12,7 @@ namespace IocContainer
     {
         private IEnumerable<InjectionTarget> _propertyTargets;
         public PropertyInjector(
-            Type serviceType, IDictionary<Type, IServiceFactory> container, Expression newInstanceVariable
+            Type serviceType, IDictionary<Type, ServiceInfo> container, Expression newInstanceVariable
         ) : base(serviceType, container, newInstanceVariable) 
         {
             

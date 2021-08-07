@@ -9,7 +9,7 @@ namespace IocContainer
         protected Expression _instanceVariable;
 
         protected MemberInjector(
-            Type serviceType, IDictionary<Type, IServiceFactory> container, Expression instanceVariable
+            Type serviceType, IDictionary<Type, ServiceInfo> container, Expression instanceVariable
         ) : base(serviceType, container)
         {
             _instanceVariable = instanceVariable;
